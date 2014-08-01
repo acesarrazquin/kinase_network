@@ -22,7 +22,6 @@ import mappings as map
 parser = argparse.ArgumentParser(description="Extraction of KSI from Reactome SBML files.")
 
 parser.add_argument("reactomefile")
-parser.add_argument("-o", "--outputfile", help="name of output file")
 
 args = parser.parse_args()
 
@@ -37,8 +36,8 @@ print("\nReading Reactome SBML file...\n")
 
 up_regex = "^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$"
 
-tree=et.parse(open(args.reactomefile))
-root=tree.getroot()
+tree = et.parse(open(args.reactomefile))
+root = tree.getroot()
 
 # map species names and uniprot codes
 spid2uniprot = {}
@@ -78,7 +77,6 @@ for sp in root.getiterator("{http://www.sbml.org/sbml/level2/version4}species"):
 #print(spid2uniprot)
 
 print("\nExtracting KSI...\n")
-
 ksi_dic = {}
 kin_out = [] # kinases not found in my list from uniprot
 for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reaction"):
@@ -88,7 +86,6 @@ for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reactio
         react_desc = desc.text
     #if not re.search(" phosphorylates ", react_name):
     #    continue
-   
     #print("\tREACTION: %s"%(react_name))
     for reactant in react.getiterator("{http://www.sbml.org/sbml/level2/version4}listOfReactants"):
         flag = 0 # to check that it's a real phosphorylation   
@@ -102,10 +99,7 @@ for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reactio
             else:
                 sp_acc = spid2uniprot[sp_id]
                     
-                if sp_acc == []:
-                    x=2
-                    #print("\t\tsubstrate %s doesn't have UniProt Accession Code"%(sp_id))
-                else:    
+                if sp_acc != []:
                     subs.extend(sp_acc)
                 
                 sp_name = spid2name[sp_id]
@@ -124,10 +118,7 @@ for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reactio
 
             sp_acc = spid2uniprot[sp_id]
 
-            if sp_acc == []:
-                x=1
-                #print("\t\tkinase %s doesn't have UniProt Accession Code"%(sp_id))
-            else:
+            if sp_acc != []:
                 kin.extend(sp_acc)
             
             sp_name = spid2name[sp_id]
@@ -153,18 +144,16 @@ for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reactio
             
             if re.match("ADP", spid2name[sp_id].split(" ")[0]):
                 flag = 1
-                continue
             else:
                 sp_acc = spid2uniprot[sp_id]
-                if sp_acc == []:
-                    x=1
-                    #print("\t\tproduct %s doesn't have UniProt Accession Code"%(sp_id))
-                else:
+                if sp_acc != []:
                     prods.extend(sp_acc)
                 
                 sp_name = spid2name[sp_id]
                 prods_names.append(sp_name)
 
+    if flag == 0:
+        continue
 #    print("\t\tKinase: %s"%(','.join(kin)))
     # get PMIDs
     pmids = []
@@ -204,7 +193,6 @@ type = "KSI"
 phospho_positions = ""
 nomap = []
 with open(outfilename1, "w") as outfile1, open(outfilename2, "w") as outfile2:
-        
         for field in outfields:
             outfile1.write(field+"\t")
             outfile2.write(field+"\t")

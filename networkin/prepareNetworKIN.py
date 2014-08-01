@@ -3,17 +3,7 @@
 ##############################################################################################################
 # prepareNetworKIN.py changes the predictions made by NetworKIN v3 to the common database format.
 #
-# To map ENSP identifiers to UniProt and GeneNames, 2 options:
-#       - use biodb: e.g. SELECT gene_name.name FROM dbentry ensp_de JOIN xref ON 
-#                            xref.dependent_dbentry_id = ensp_de.dbentry_id JOIN dbentry_gene_name degn ON 
-#                            degn.dbentry_id = xref.master_dbentry_id JOIN gene_name USING(gene_name_id) WHERE 
-#                            ensp_de.accession='ENSP00000341821' AND gene_name.database_id=11
-#       - use files (as Peter does)
-#           - from ensp to uniprot: HUMAN_9606_idmapping_selected.tab (from UniProt database)
-#           - from UniProt to gene symbols: HGCN file, or biomart (Check)
-#
-#
-#
+# Necessary to map ENSP identifiers to UniProt and GeneNames
 ##############################################################################################################
 
 import argparse
@@ -25,10 +15,6 @@ parser = argparse.ArgumentParser(description="Assembly of KSI from NetworKIN pre
 
 parser.add_argument("networkinfile")
 parser.add_argument("-o", "--outputfile", help="name of output file")
-#parser.add_argument("-g", "--genenamefile", default="inputfiles/sp2name_human-20140703.tab", dest="gnfile",
-#                    help="table of uniprot accesion codes, gene symbols, protein names and descriptions.") # biomart seems bettwer than HGCN
-#parser.add_argument("-m", "--mappfile", default="inputfiles/HUMAN_9606_idmapping_selected_uniprot20140625.tab", dest="mapfile")
-#parser.add_argument("-k", "--kinfile", default="inputfiles/uniprot_kin_formatted_annotated.txt", dest="kinfile")
 
 args = parser.parse_args()
 
@@ -55,14 +41,19 @@ kinnot = []
 nomap_ensp = []
 with open(args.networkinfile) as netfile, open(outputfile, "w") as outfile:
     print("\nFormatting NetworKIN data...\n")
-    
+
+    # write headers
+    for field in outfields:
+        outfile.write(field + "\t")
+    outfile.write("\n")
+
     lines = netfile.readlines()
     counter = 0
     for line in lines:
         counter += 1
         if counter == 1:
             fields = re.sub("#", "", line).rstrip().split("\t")
-            outfile.write("\t".join(outfields)+"\n")
+            #outfile.write("\t".join(outfields)+"\n") # could use this strategy for all cases
 
         else:
             split_line = line.rstrip().split("\t")
@@ -158,9 +149,8 @@ with open(args.networkinfile) as netfile, open(outputfile, "w") as outfile:
                     # other fields:
                     PMIDs = ""
                     sources = "networkin"
-                    dates = ""
+                    dates = "2014"
                     type = "KSI"
-            
 
                     for field in outfields:
                         outfile.write(vars()[field] + "\t")

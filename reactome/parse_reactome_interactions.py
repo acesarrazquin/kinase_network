@@ -1,5 +1,5 @@
 #!/cm/shared/apps/python/2.7.6/bin/python
-
+# DEPRECATED: use MITAB
 #########################################################################################################################3
 # Script to extract PPI from Reactome file "Human protein-protein interaction pairs in tab-delimited format"
 #

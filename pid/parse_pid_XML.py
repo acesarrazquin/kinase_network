@@ -10,8 +10,12 @@
 # Checks if it's phosphorylation by comparing the modifications in inputs and outputs of "modification" interactions.
 # Phosphorylation positions are included.
 # Filters kinases so that we only include the ones in the kinase list. If several kinases are involved in the reaction, each
-# KSI (one for each kinase) is considered (IS THIS OK?), but are marked as "expanded".
+# KSI (one for each kinase) is considered, but are marked as "expanded" (possible to filter).
 #
+# Evidence codes also included: (FILTER FOR EVIDENCE???)
+#   - IAE (Inferred from Array Experiments), IC (Inferred by Curator), IDA (Direct Assay), IFC (Funcional Complementation),
+#     IGI (Genetic Interaction), IMP (Mutant Phenotype), IOS (Other Species), IPI (Physical Interaction), RCA (Reviewed COmputational Analysis),
+#     RGE (Reporter Gene Expression), TAS (Traceable Author Statement)
 # Output:   - dip_ksi.txt -> 1 to 1 relation between a kinase and a substrate. In database format: source, target, source_name...with three more columns: evidence (evidence codes), interaction_id (in the file), expanded (if more than one kinase was present)
 #           - dip_ppi.txt 
 ###################################################################################################################################
@@ -25,10 +29,8 @@ import mappings as map
 parser = argparse.ArgumentParser(description="Extraction of KSI from PID XML files.")
 
 parser.add_argument("pidfile")
-#parser.add_argument("-o", "--outputfile", help="name of output file")
-#parser.add_argument("-k", "--kinasefile", default="../inputfiles/uniprot_kin_formatted_annotated.txt", dest="kinfile")
-#parser.add_argument("-g", "--genenamefile", default="../inputfiles/sp2name_human-20140703.tab", dest="gnfile",
-#                    help="table of uniprot accesion codes, gene symbols, protein names and descriptions.")
+parser.add_argument("-e", "--expanded", action="store_true", help="consider KSI when several kinases involved (one KSI per kinase)")
+parser.add_argument("-m", "--members", action="store_true", help="consider family memebers")
 args = parser.parse_args()
 
 # create list of kinases uniprot accession codes
@@ -53,6 +55,7 @@ molecules = root.find("Model").find("MoleculeList").findall("Molecule")# list of
 id2uniprot = {}
 entrez_nomap = []
 print("\tdoing PROTEINS...")
+
 # first extract simple proteins (not complexes) -> necessary to then map complexes and proteins with "members"
 for molecule in molecules:
     mol_type = molecule.attrib["molecule_type"]
@@ -95,7 +98,14 @@ for molecule in molecules:
 
 ppi_dic = {}
 ppi_dic = {}
-for moltype in ['complex']: #first parse the "protein" Families, then the "complexes" (only possible option, as some complexes have families)
+
+# apply filter for members
+if args.members:
+    moltypes = ['protein', 'complex']
+else:
+    moltypes = ['complex']
+
+for moltype in moltypes: #first parse the "protein" Families, then the "complexes" (only possible option, as some complexes have families)
     print("\tdoing %s..."%(re.sub("PROTEIN", "PROTEIN FAMILIES", moltype.upper())))
     if moltype == "complex":
         iter_name = "ComplexComponent"
@@ -183,6 +193,7 @@ if not re.search("BioCarta", args.pidfile):
     print("\tdoing INTERACTIONS...")
 else:
     interactions = [] # empty list in case of interactions
+
 ksi_dic = {}
 for interaction in interactions:
     int_type = interaction.attrib["interaction_type"]
@@ -247,6 +258,10 @@ for interaction in interactions:
         kinase = list(set(kinase))
         
         if kinase == []:
+            continue
+
+        # apply filter for kinase "expansion"
+        if len(kinase)>1 and not args.expanded:
             continue
 
         # check phosphorylation event: compare inputs vs. outputs
@@ -317,10 +332,18 @@ for interaction in interactions:
 # write files:
 nomap=[]            
 print("\n Writing files...\n")
-outfilename = "pid_" + args.pidfile.split(".")[0] + "_ksi_nomember.txt"
+outfilename = "pid_" + args.pidfile.split(".")[0]
+if args.members:
+    outfilename += "_members"
+if args.expanded:
+    outfilename += "_expanded"
+outfilename += "_ksi.txt"
 
 outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
-outfields.extend(["evidence", "interaction_id", "expanded_kinases"]) 
+outfields.extend(["evidence", "interaction_id"])
+if args.expanded:
+    outfields.append("expanded_kinases")
+
 dates = "2014"
 sources = "pid(" + args.pidfile.split(".")[0] + ")"
 type = "KSI"
@@ -372,7 +395,11 @@ type = "PPI"
 source_is_bait = "no"
 target_is_bait = "no"
 
-outfilename = "pid_" + args.pidfile.split(".")[0] + "_ppi_nomember.txt"
+outfilename = "pid_" + args.pidfile.split(".")[0]
+if args.members:
+    outfilename += "_members"
+outfilename += "_ppi.txt"
+
 with open(outfilename, "w") as outfile:
     for field in outfields:
         outfile.write(field + "\t")

@@ -4,25 +4,12 @@
 # Script to extract PPI from Reactome file "Human protein-protein interaction pairs in tab-delimited format"
 #
 # Input: - reactome file
-#        - genenamefile, to convert accession numbers to gene symbols
 #
 # Output: -reactome_ppi.txt, in database format with some added columns (reaction_type, reaction_id) 
 #
-# Possibitlity to filter for reaction type...Now really to the interaction types:
-#       - direct_complex - interactors are directly in the same complex, i.e. 
-#                           w/o further nested complexes. From the example interactions A <->B and 
-#                           C<-D> are of this type.
-#       - indirect_complex - interactors in different subcomplexes of a complex.
-#                           From the example above interactions A<->C, A<->D, B<->C and B<->D are 
-#                           of this type.
-#       - reaction - interactors participate in the same reaction. Only those 
-#                   reactions are reported for which the intreactors are not complexed (with 
-#                   the exception being association dissociation reactions which are reported).
-#       - neighbouring_reaction - interactor participate in 2 "consecutive"
-#                               reactions, i.e. when one reaction produces a PhysicalEntity which is either an 
-#                               input or a catalyst for another reaction. However, to avoid the "trivial" (i.e.
-#                               over ATP, ADP etc) interactions, the computation is done using the
-#                               'precedingEvent' attribute used to order reactions in a pathway.
+# Possibitlity to filter for interaction type:
+#       - association
+#       - physical association
 ########################################################################################################################
 import argparse
 import re
@@ -30,12 +17,11 @@ from xml.etree import ElementTree as et
 import mappings as map
 
 # parse arguments
-parser = argparse.ArgumentParser(description="Extraction of KSI from Reactome SBML files.")
+parser = argparse.ArgumentParser(description="Extraction of KSI from Reactome interaction file, in mitab format.")
 
 parser.add_argument("reactomefile")
-#parser.add_argument("-o", "--outputfile", help="name of output file")
-#parser.add_argument("-g", "--genenamefile", default="inputfiles/sp2name_human-20140703.tab", dest="gnfile",
- #                   help="table of uniprot accesion codes, gene symbols, protein names and descriptions.")
+parser.add_argument("-t", "--int_type", help="interaction type", choices=["association", "physical association", "any"], default="any")
+
 args = parser.parse_args()
 
 # create list of kinases uniprot accession codes
@@ -50,13 +36,21 @@ with open(args.reactomefile) as rfile:
     for line in lines[1:len(lines)]:
         
         split_line = line.rstrip().split("\t")
+
         source = split_line[0].split(":")[1].split("-")[0]
         target = split_line[1].split(":")[1].split("-")[0]
         
         # only uniprot proteins
         if not re.match(up_regex, source) or not re.match(up_regex, target):
             continue
-        
+
+        # apply interaction type filter
+        int_type = split_line[11].split("(")[1]
+        int_type = int_type[0:len(int_type)-1]
+
+        if args.int_type != "any" and args.int_type != int_type:
+            continue
+
         # no self-interactions # for the moment I include everything
         #if source==target:
         #    continue
@@ -66,9 +60,6 @@ with open(args.reactomefile) as rfile:
         #for complex in complex_ids:
         #    complex_id = complex.split(":")[1]
         #    complex_ids.append(complex_id)
-        
-        int_type = split_line[11].split("(")[1]
-        int_type = int_type[0:len(int_type)-1]
 
         pmid = split_line[8].split(":")[1] # there is only the general for reactome...
 
@@ -86,7 +77,8 @@ with open(args.reactomefile) as rfile:
             ppi_dic[key]["complex_id"].extend(complex_ids)
             ppi_dic[key]["pmid"].extend([pmid])
 
-outfilename = "reactome_mitab_ppi.txt"
+outfilename = "reactome_mitab_ppi_" + args.int_type + ".txt"
+outfilename = re.sub(" ", "", outfilename)
 fields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", 
           "source_is_bait", "target_is_bait"]
 fields.extend(["complex_id", "interaction_type"]) # in case i want to add them
