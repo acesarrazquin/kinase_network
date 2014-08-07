@@ -305,27 +305,34 @@ with open(outfilename, "w") as outfile:
 
     # write header
     for field in fields:
-        if fields.index(field) == len(fields)-1:
-            outfile.write(field+"\n")
-        else:
-            outfile.write(field+"\t")
+        outfile.write(field+"\t")
+    outfile.write("\n")
+        # if fields.index(field) == len(fields)-1:
+        #     outfile.write(field+"\n")
+        # else:
+        #     outfile.write(field+"\t")
 
     # write contents
     for key in interact.keys():
         for field in fields:
             towrite = interact[key][field]
-            if fields.index(field) == len(fields)-1:
-                if type(towrite) == list:
-                    towrite = set(towrite)
-                    outfile.write(",".join(towrite) + "\n")
-                else:
-                    outfile.write(towrite + "\n")
-            else:
-                if type(towrite) == list:
-                    towrite = set(towrite)
-                    outfile.write(",".join(towrite) + "\t")
-                else:
-                    outfile.write(towrite + "\t")
+            if type(towrite) == list:
+                towrite = ','.join(set(towrite))
+            outfile.write(towrite + '\t')
+        outfile.write("\n")
+
+            # if fields.index(field) == len(fields)-1:
+            #     if type(towrite) == list:
+            #         towrite = set(towrite)
+            #         outfile.write(",".join(towrite) + "\n")
+            #     else:
+            #         outfile.write(towrite + "\n")
+            # else:
+            #     if type(towrite) == list:
+            #         towrite = set(towrite)
+            #         outfile.write(",".join(towrite) + "\t")
+            #     else:
+            #         outfile.write(towrite + "\t")
 
 notfound = set(notfound)
 print("\nNOTE: %d protein accession numbers not mapped to gene name: %s\n"%(len(notfound), ','.join(notfound)))

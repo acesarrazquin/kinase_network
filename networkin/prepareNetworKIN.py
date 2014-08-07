@@ -147,7 +147,7 @@ with open(args.networkinfile) as netfile, open(outputfile, "w") as outfile:
                     phospho_positions = position
 
                     # other fields:
-                    PMIDs = ""
+                    PMIDs = "24874572"
                     sources = "networkin"
                     dates = "2014"
                     type = "KSI"

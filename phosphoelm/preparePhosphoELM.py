@@ -73,7 +73,7 @@ notmapped_up = []
 nolist_kin = []
 with open(args.phosphoelmfile) as elmfile:
     lines = elmfile.readlines()
-    for line in lines[0:len(lines)]:
+    for line in lines[1:len(lines)]:
         split_line = line.split("\t")
         
         if split_line[7] != "Homo sapiens":
