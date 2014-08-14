@@ -9,10 +9,10 @@
 nkin <- read.table("networkin_formated.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
 
 # open known KSI (for the moment I don't consider KSI from pathways (reactome, PID))
-pelm <- read.table("../phosphoelm/phosphoelm_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
-psplus <- read.table("../phosphositeplus/phosphositeplus_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
-pnets <- read.table("../phosphonetworks/phosphonetworks_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
-intdb <- read.table("../interactdb/interactdb_ksi_NEW.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
+pelm <- read.table("phosphoelm/phosphoelm_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
+psplus <- read.table("phosphositeplus/phosphositeplus_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
+pnets <- read.table("phosphonetworks/phosphonetworks_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
+intdb <- read.table("interactdb/interactdb_ksi.txt", sep="\t", header=TRUE, stringsAsFactors=FALSE)
 
 # check overlap
 all.ksi <- data.frame(kinase=c(intdb[,1], pelm[,1], psplus[,1], pnets[,1]), 

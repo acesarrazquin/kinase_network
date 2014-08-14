@@ -22,6 +22,9 @@ def appendKey(int_dic, key, headers, values):
 
 def updateKey(int_dic, key, **kw):
     for key2 in kw.keys():
+        if kw[key2] == '' or kw[key2] == "NA":
+            continue
+
         if int_dic[key][key2] != "" and int_dic[key][key2] != "NA":
             int_dic[key][key2] += ',' + kw[key2]
         else:
@@ -46,7 +49,7 @@ if args.int_type == "PPI":
     headers.extend(["source_is_bait", "target_is_bait"])
     outname = "all_ppi_%s.txt"%(today)
 elif args.int_type == "KSI":
-    headers.append("phospho_positions")
+    headers.append("positions")
     outname = "all_ksi_%s.txt"%(today)
 elif args.int_type == "DPI":
     headers.extend(['source_IDs', 'target_form', 'strength', 'strength_type',
@@ -125,8 +128,10 @@ if args.outname:
 else:
     outfilename = outname
 
-dpi_noset = ['target_form', 'strength', 'strength_type',
-             'strength_direction', 'strong_target', 'technology', 'cell_type'] # fields where I don't want only the unique but all
+headers_set = ["PMIDs", "sources",
+               "positions",
+               "source_IDs"]
+
 with open(outfilename, "w") as outfile:
 
     outfile.write('\t'.join(headers) + '\n')
@@ -136,10 +141,10 @@ with open(outfilename, "w") as outfile:
         for header in headers:
             if header == "dates":
                 value = ",".join(sorted(set(int_dic[key][header].split(",")), reverse=True))
-            elif header in dpi_noset:
-                value = int_dic[key][header]
-            else:
+            elif header in headers_set:
                 value = ",".join(sorted(set(int_dic[key][header].split(","))))
+            else:
+                value = int_dic[key][header]
             values += "\t" + value
         values = values[1:len(values)] + "\n"
         outfile.write(values)

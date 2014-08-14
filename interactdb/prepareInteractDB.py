@@ -4,7 +4,8 @@
 # applies some filters (e.g. no biogrid, only physical interactions, etc...), and generates an output file in an adequate format
 # to generate the Human Protein Kinase Network.
 #
-# To extract PPI or KSI ("phosphorylation reaction"), with possibility to include CeMM confidential PPIs as well as from
+# To extract PPI, KSI ("phosphorylation reaction" OR "phosphotransfer reaction") or ESI (enzyme-substrate, 'reaction' in list),
+# with possibility to include CeMM confidential PPIs as well as from
 # Couzens et al. paper (though they are already included in the latest IntAct version)
 #
 #
@@ -14,7 +15,7 @@
 #
 # Output: file with fields ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type"]
 #   if PPI also ["source_is_bait", "target_is_bait"]
-#   if KSI also ["phospho_positions"] (although this field will be empty for this dataset)
+#   if KSI also ["positions"] (although this field will be empty for this dataset)
 #
 ###########################################################################################################################
 import argparse
@@ -26,10 +27,11 @@ parser = argparse.ArgumentParser(description="Assembly of interactions from Inte
 
 parser.add_argument("interactionfile")
 parser.add_argument("-o", "--outputfile", help="name of output file")
-parser.add_argument("-t", "--type", choices=["PPI", "KSI"], default="PPI", help="type of interaction data")
+parser.add_argument("-t", "--type", choices=["PPI", "KSI", "ESI"], default="PPI", help="type of interaction data")
 parser.add_argument("-x", "--taxon", choices=["human", "mouse"], default="human")
-parser.add_argument("-c", "--withcemm", action="store_true", help="include CeMM confidential interactions")
+parser.add_argument("-c", "--cemm", action="store_true", help="include CeMM confidential interactions")
 parser.add_argument("-z", "--couzens", action="store_true", help="include interactions from 'Couzens et al.'")
+parser.add_argument("-v", "--convert", action="store_true", help="convert secondary to primary accessions (time expensive, retrieves few more interactions)")
 
 args = parser.parse_args()
 
@@ -40,8 +42,9 @@ elif args.taxon == "mouse":
     taxon_id = 10090
 
 # create dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
-
+uniprot2symbol = map.getUniprotMapDicts()
+if args.convert:
+    sec2prim = map.getSecondary2PrimaryAcc()
 
 # create list of kinases uniprot accession codes
 kinacc2name = map.getKinaseAcc2Symbol()
@@ -55,6 +58,8 @@ with open(args.interactionfile) as intfile:
     counter = 0
     for line in intfile:
         counter += 1
+        if counter % 1000 == 0:
+            print(counter)
 
         split_line = line.rstrip().split("\t")
 
@@ -74,23 +79,29 @@ with open(args.interactionfile) as intfile:
             publications_list = publications.split("@@")
             experimentalrole_list = experimentalrole.split(",")
             
-            # KSI vs PPI (if interactiontype contains 'phosphorylation reaction', consider only as KSI)
-            if "phosphorylation reaction" in interactiontypes_list:
+            # KSI vs PPI vs ESI (if interactiontype contains 'phosphorylation reaction', consider only as KSI)
+            if "phosphorylation reaction" in interactiontypes_list or "phosphotransfer reaction" in interactiontypes_list:
                 if args.type == "PPI":
                     continue
-            else:
+            elif re.search("reaction", ' '.join(interactiontypes_list)):
                 if args.type == "KSI":
+                    continue
+            else:
+                if args.type == "KSI" or args.type == "ESI":
                     continue
             
             # UniProt pairs only
             if p1_database != "UniProt" or p2_database != "UniProt":
                 continue
 
+            # no biogrid (it should be already out)
+            if len(set(sources_list)) == 1 and "biogrid" in sources_list:
+                continue
 
             # 1. do not distinguish between isoforms: "-[0-9]" at the end of accesssion code
             # 2. remove naming errors detected in some cases...
-            isoform_pattern = "-[1-9]$"
-            wrong_pattern1 = "PRO_"
+            isoform_pattern = "-[1-9]+$"
+            wrong_pattern1 = "PRO_.*"
             wrong_pattern2 = "\|$"
             
             p_from = re.sub(isoform_pattern,"", p1_accession)
@@ -101,25 +112,34 @@ with open(args.interactionfile) as intfile:
             p_to = re.sub(wrong_pattern1,"", p_to)
             p_to = re.sub(wrong_pattern2,"", p_to)
 
-
             # Maps Uniprot accessions to gene names -> if not, then continue (not in my Swissprot list)
             try:
                 p_from_name = uniprot2symbol[p_from]
             except:
-                notfound.append(p_from)
-                continue
-                #print("protein %s not found in dictionary"%(p_from))
+                try:
+                    p_from_prim = sec2prim[p_from]
+                    p_from_name = uniprot2symbol[p_from_prim]
+                    p_from = p_from_prim
+                except:
+                    notfound.append(p_from)
+                    continue
+                    #print("protein %s not found in dictionary"%(p_from))
 
             try:
                 p_to_name = uniprot2symbol[p_to]
             except:
-                notfound.append(p_to)
-                continue
-                #print("protein %s not found in dictionary"%(p_to))
+                try:
+                    p_to_prim = sec2prim[p_to]
+                    p_to_name = uniprot2symbol[p_to_prim]
+                    p_to = p_to_prim
+                except:
+                    notfound.append(p_to)
+                    continue
+                    #print("protein %s not found in dictionary"%(p_to))
 
-            # No self interactions
-            if p_from == p_to:
-                continue
+            # No self interactions (remove just in last file)
+            # if p_from == p_to:
+            #     continue
 
            # Check for unambiguous KSI.
                # NOTE: the "phosphorylation reaction" annotation comes from IntAct and it's ambiguous in the directionality.
@@ -136,9 +156,28 @@ with open(args.interactionfile) as intfile:
                     tmp = p_from
                     p_from = p_to
                     p_to = tmp
+
+            react_type = ''
+            if args.type == "ESI": # extract everything that it's a reaction (no directionality)
+                reacts =[]
+                for interactiontype in interactiontypes_list:
+                    if re.search("reaction", interactiontype) and not re.search("enzymatic", interactiontype):
+                        reacts.append(interactiontype)
+                reacts = list(set(reacts)) # unique reactions
+
+                if len(reacts) == 0:
+                    print('\tNo reaction types: %s'%("||".join(interactiontypes_list)))
+                    continue
+                elif len(reacts) > 1:
+                    react_type = "||".join(reacts)
+                    print('\tConflict reaction types %s: %s %s'%(react_type, p_from_name, p_to_name))
+                    react_type = re.sub(" ", "_", re.sub(" reaction", "", react_type))
+                else:
+                    react_type = re.sub(" ", "_", reacts[0].split(" reaction")[0])
+
             
            # apply CeMM confidential interactions filter:
-            if not args.withcemm:
+            if not args.cemm:
                 if "cemm_confidential" in sources_list:
                     if len(sources_list) == 1:
                         continue
@@ -161,10 +200,12 @@ with open(args.interactionfile) as intfile:
                 ## what does this do here? $elem =~ /^([0-9]+)~[A-Z]/;
                 if pmid == "N/A" or pmid == "":
                     pmid = "NA"
-                elif re.search("unassigned", pmid):
+                elif re.search("unassigned", pmid) or pmid == "missing_pmid":
+                    pmid = "NA"
+                elif not re.match('^[0-9]+$', pmid):
                     pmid = "NA"
                 pmids.append(pmid)
-                
+
                 year = publication_split[2]
                 if year == "N/A":
                     year = "NA"
@@ -191,15 +232,19 @@ with open(args.interactionfile) as intfile:
                 interact[key]["PMIDs"] = pmids
                 interact[key]["dates"] = dates
                 interact[key]["type"] = args.type
-                interact[key]["phospho_positions"] = ""
+                interact[key]["positions"] = ""
+                interact[key]["reaction_type"] = react_type
 
             else: # append data of sources, pmids, and dates
                 for i in range(0,len(sources_list)):
+
                     if (pmids[i] not in interact[key]["PMIDs"]) or (sources_list[i] not in interact[key]["sources"]):
                         interact[key]["sources"].append(sources_list[i])
                         interact[key]["PMIDs"].append(pmids[i])
                         interact[key]["dates"].append(dates[i])
                         #print("Data appended for key: %s"%(key))
+                if react_type != interact[key]["reaction_type"]:
+                    interact[key]["reaction_type"] = "|".join([interact[key]["reaction_type"], react_type])
 
             # Assigns roles checking possible reversed source/target in previous lines
             for role in experimentalrole_list:
@@ -214,11 +259,10 @@ with open(args.interactionfile) as intfile:
                     else:
                         interact[key]["source_is_bait"] = "yes"
 
-
             
 # data from Couzens et al. "Protein Interaction Network of the Mammalian Hippo Pathway Reveals Mechanisms of Kinase-Phosphatase Interactions"
 # IT SHOULD BE INCLUDED IN NEW UPDATE OF THE PPI DATABASE!!
-if args.couzens:
+if args.couzens and args.type == "PPI":
     with open("couzens-et-al.txt") as couzensfile:
         print("\nRetrieving interactions from Couzens et al...\n")
         
@@ -246,9 +290,9 @@ if args.couzens:
                 notfound.append(p_to)
                 continue
 
-            # no self interaction
-            if p_from == p_to:
-                continue
+            # # no self interaction
+            # if p_from == p_to:
+            #     continue
             
             # append to dictionary if new
             sorted_p = sorted([p_from, p_to])
@@ -267,6 +311,7 @@ if args.couzens:
                 interact[key]["PMIDs"] = "24255178"
                 interact[key]["dates"] = "2013"
                 interact[key]["type"] = args.type
+                interact[key]["reaction_type"] = ''
             else:
                 if ("intact" not in interact[key]["sources"]) or ("24255178" not in interact[key]["PMIDs"]):
                     interact[key]["sources"].append("intact")
@@ -279,15 +324,13 @@ if args.couzens:
             if split_line[19] == 'psi-mi:"MI:0496"(bait)':
                 interact[key]["target_is_bait"] = 'yes'
 
-
-
 # output file:
 if args.outputfile:
     outfilename = args.outputfile
 else:
     outfilename = args.interactionfile.split(".")[0]
     outfilename += "_" + args.taxon + "_" + args.type
-    if args.withcemm:
+    if args_cemm:
         outfilename += "withcemm"
     if args.couzens:
         outfilename += "couzens"
@@ -300,17 +343,15 @@ with open(outfilename, "w") as outfile:
     if args.type == "PPI":
         fields.extend(["source_is_bait", "target_is_bait"])
     elif args.type == "KSI":
-        fields.append("phospho_positions")
+        fields.append("positions")
+    elif args.type == "ESI":
+        fields.extend(["positions", "reaction_type"])
 
 
     # write header
     for field in fields:
         outfile.write(field+"\t")
     outfile.write("\n")
-        # if fields.index(field) == len(fields)-1:
-        #     outfile.write(field+"\n")
-        # else:
-        #     outfile.write(field+"\t")
 
     # write contents
     for key in interact.keys():
@@ -320,19 +361,6 @@ with open(outfilename, "w") as outfile:
                 towrite = ','.join(set(towrite))
             outfile.write(towrite + '\t')
         outfile.write("\n")
-
-            # if fields.index(field) == len(fields)-1:
-            #     if type(towrite) == list:
-            #         towrite = set(towrite)
-            #         outfile.write(",".join(towrite) + "\n")
-            #     else:
-            #         outfile.write(towrite + "\n")
-            # else:
-            #     if type(towrite) == list:
-            #         towrite = set(towrite)
-            #         outfile.write(",".join(towrite) + "\t")
-            #     else:
-            #         outfile.write(towrite + "\t")
 
 notfound = set(notfound)
 print("\nNOTE: %d protein accession numbers not mapped to gene name: %s\n"%(len(notfound), ','.join(notfound)))
