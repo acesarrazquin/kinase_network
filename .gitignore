@@ -13,3 +13,5 @@ pid/jacques-pathwaydb/*
 *.dump
 *.tsv
 *tmp
+*.xls
+*.xlsx

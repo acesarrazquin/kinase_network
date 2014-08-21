@@ -16,11 +16,12 @@
 # Output: file with fields ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type"]
 #   if PPI also ["source_is_bait", "target_is_bait"]
 #   if KSI also ["positions"] (although this field will be empty for this dataset)
-#
+#   if ESI also ["positions", "reaction_type"]
 ###########################################################################################################################
 import argparse
 import re
 import mappings as map
+import datetime
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Assembly of interactions from InteractionDB files.")
@@ -58,8 +59,8 @@ with open(args.interactionfile) as intfile:
     counter = 0
     for line in intfile:
         counter += 1
-        if counter % 1000 == 0:
-            print(counter)
+        # if counter % 1000 == 0:
+        #     print(counter)
 
         split_line = line.rstrip().split("\t")
 
@@ -325,6 +326,7 @@ if args.couzens and args.type == "PPI":
                 interact[key]["target_is_bait"] = 'yes'
 
 # output file:
+today = datetime.date.today().strftime("%Y%m%d")
 if args.outputfile:
     outfilename = args.outputfile
 else:
@@ -334,7 +336,7 @@ else:
         outfilename += "withcemm"
     if args.couzens:
         outfilename += "couzens"
-    outfilename += ".txt"
+    outfilename += '_' + today + ".txt"
 
 print("\nWriting output file %s...\n"%(outfilename))
 with open(outfilename, "w") as outfile:
