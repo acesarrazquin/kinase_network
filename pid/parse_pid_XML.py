@@ -24,13 +24,18 @@ import re
 import copy
 from xml.etree import ElementTree as et
 import mappings as map
+import datetime
 
+
+today = datetime.date.today().strftime("%Y%m%d")
 # parse arguments
 parser = argparse.ArgumentParser(description="Extraction of KSI from PID XML files.")
 
 parser.add_argument("pidfile")
 parser.add_argument("-e", "--expanded", action="store_true", help="consider KSI when several kinases involved (one KSI per kinase)")
 parser.add_argument("-m", "--members", action="store_true", help="consider family memebers")
+parser.add_argument("-o", "--outputfile", help="name of output file")
+
 args = parser.parse_args()
 
 # create list of kinases uniprot accession codes
@@ -40,7 +45,8 @@ kinacc2name = map.getKinaseAcc2Symbol()
 entrez2uniprot = map.getEntrez2Uniprot()
 
 # get dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol = map.getUniprotMapDicts()
+sec2prim = map.getSecondary2PrimaryAcc()
 
 # read PID file
 print("\nReading PID XML file...\n")
@@ -314,7 +320,7 @@ for interaction in interactions:
                         ksi_dic[key]['target'] = prot
                         ksi_dic[key]['pmids'] = pmids
                         ksi_dic[key]['evids'] = evids
-                        ksi_dic[key]['phospho_positions'] = phospho_positions
+                        ksi_dic[key]['positions'] = phospho_positions
                         ksi_dic[key]['id'] = int_id_all
                         ksi_dic[key]['expanded_kinases'] = kin_exp
                     else:
@@ -326,26 +332,30 @@ for interaction in interactions:
                             if evid not in ksi_dic[key]['evids']:
                                 ksi_dic[key]['evids'].append(evid)
                         for phosph in phospho_positions:
-                            if phosph not in ksi_dic[key]['phospho_positions']:
-                                ksi_dic[key]['phospho_positions'].append(phosph)
+                            if phosph not in ksi_dic[key]['positions']:
+                                ksi_dic[key]['positions'].append(phosph)
             
 # write files:
 nomap=[]            
 print("\n Writing files...\n")
-outfilename = "pid_" + args.pidfile.split(".")[0]
-if args.members:
-    outfilename += "_members"
-if args.expanded:
-    outfilename += "_expanded"
-outfilename += "_ksi.txt"
 
-outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
+if args.outputfile:
+    outfilename = args.outputfile
+else:
+    outfilename = "pid_" + args.pidfile.split(".")[0]
+    if args.members:
+        outfilename += "_members"
+    if args.expanded:
+        outfilename += "_expanded"
+    outfilename += "_ksi" + today + ".txt"
+
+outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "positions"]
 outfields.extend(["evidence", "interaction_id"])
 if args.expanded:
     outfields.append("expanded_kinases")
 
 dates = "2014"
-sources = "pid(" + args.pidfile.split(".")[0] + ")"
+sources = "pid"#(" + args.pidfile.split(".")[0] + ")"
 type = "KSI"
 with open(outfilename, "w") as outfile:
 
@@ -360,20 +370,28 @@ with open(outfilename, "w") as outfile:
         try:
             source_name = uniprot2symbol[source]
         except:
-            nomap.append(source)
-            continue
+            try:
+                source = sec2prim[source]
+                source_name = uniprot2symbol[source]
+            except:
+                nomap.append(source)
+                continue
 
         try:
             target_name = uniprot2symbol[target]
         except:
-            nomap.append(target)
-            continue
+            try:
+                target = sec2prim[target]
+                target_name = uniprot2symbol[target]
+            except:
+                nomap.append(target)
+                continue
 
         PMIDs = ','.join(ksi_dic[key]['pmids'])
 
         interaction_id = ksi_dic[key]['id']
             
-        phospho_positions = ",".join(ksi_dic[key]['phospho_positions'])
+        positions = ",".join(ksi_dic[key]['positions'])
             
         evidence = ",".join(ksi_dic[key]['evids'])
         
@@ -390,7 +408,7 @@ outfields.extend(["complex_name", "complex_id", "complex_nb"])
 nomap_ppi = []
 PMIDs = ""
 dates = "2014"
-sources = "pid(" + args.pidfile.split(".")[0] + ")"
+sources = "pid"#(" + args.pidfile.split(".")[0] + ")"
 type = "PPI"
 source_is_bait = "no"
 target_is_bait = "no"
@@ -398,7 +416,7 @@ target_is_bait = "no"
 outfilename = "pid_" + args.pidfile.split(".")[0]
 if args.members:
     outfilename += "_members"
-outfilename += "_ppi.txt"
+outfilename += "_ppi_" + today + ".txt"
 
 with open(outfilename, "w") as outfile:
     for field in outfields:
@@ -412,13 +430,21 @@ with open(outfilename, "w") as outfile:
         try:
             source_name = uniprot2symbol[source]
         except:
-            nomap_ppi.append(source)
-            continue
+            try:
+                source = sec2prim[source]
+                source_name = uniprot2symbol[source]
+            except:
+                nomap_ppi.append(source)
+                continue
         try:
             target_name = uniprot2symbol[target]
         except:
-            nomap_ppi.append(target)
-            continue
+            try:
+                target = sec2prim[target]
+                target_name = uniprot2symbol[target]
+            except:
+                nomap_ppi.append(target)
+                continue
         
         complex_name = '~'.join(ppi_dic[key]["complex_name"])
         complex_id = ','.join(ppi_dic[key]["complex_id"])

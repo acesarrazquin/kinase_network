@@ -4,7 +4,8 @@
 # To format the file with kinases retrieved from uniprot: uniprot.org/docs/pkinfam.txt
 #
 #
-#
+# Include unambiguous synonyms and filtered synonyms for English words.
+###########################################################################################################################
 
 import re
 import argparse

@@ -12,18 +12,20 @@
 #                
 ###############################################################################################
 import argparse
-import re
+import datetime
 import mappings as map
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Assembly of KSI from PhosphoNetworks (Newman et al.).")
 
-parser.add_argument("phosphonetfile")
-parser.add_argument("phosphonetfile2")
+parser.add_argument("phosphonetfile", help="comKSI.csv")
+parser.add_argument("phosphonetfile2", help="highResolutionNetwork")
+parser.add_argument("-o", "--outputfile", help="name of output file")
+
 args = parser.parse_args()
 
 # create dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol, syn2uniprot, uniprot2syn = map.getUniprotMapDicts(synonyms=True)
 
 #create list of kinases uniprot accession codes
 kinacc2name = map.getKinaseAcc2Symbol()
@@ -33,7 +35,7 @@ up_regex = "^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2
 PMIDs = '23549483'
 dates = '2014'
 sources = 'phosphonetworks'
-outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
+outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "positions"]
 outfields.extend(["score", "phospho_score"])
 
 notmapped = []
@@ -48,13 +50,13 @@ with open(args.phosphonetfile) as comksifile:
         source_symb = split_line[0]
         target_symb = split_line[1]
         score = split_line[2]
-        
+
         try:
-            source =  syn2uniprot[source_symb]
+            source = syn2uniprot[source_symb]
         except:
             notmapped.append(source_symb)
             continue
-        
+
         if not kinacc2name.has_key(source):
             notkin.append(source)
             continue
@@ -78,7 +80,7 @@ with open(args.phosphonetfile) as comksifile:
             ksi_dic[key]["target"] = target
             ksi_dic[key]["source_name"] = source_name
             ksi_dic[key]["target_name"] = target_name
-            ksi_dic[key]["phospho_positions"] = []
+            ksi_dic[key]["positions"] = []
             ksi_dic[key]["score"] = score
             ksi_dic[key]["PMIDs"] = PMIDs
             ksi_dic[key]["dates"] = dates
@@ -111,7 +113,7 @@ with open(args.phosphonetfile2) as netfile:
 
             source_symbol = split_kin[2]
             phospho_score = split_kin[3]
-            phospho_positions = split_kin[1][1:len(split_kin[1])]
+            positions = split_kin[1][1:len(split_kin[1])]
 
             # get uniprot accessions
 
@@ -129,7 +131,7 @@ with open(args.phosphonetfile2) as netfile:
             
             key = source + "||" + target
             if not ksi_dic.has_key(key):
-                print("NEw!!")
+                # print("NEw!!")
 
                 ksi_dic[key] = {}
                 
@@ -137,7 +139,7 @@ with open(args.phosphonetfile2) as netfile:
                 ksi_dic[key]["target"] = target
                 ksi_dic[key]["source_name"] = source_name
                 ksi_dic[key]["target_name"] = target_name
-                ksi_dic[key]["phospho_positions"] = [phospho_positions]
+                ksi_dic[key]["positions"] = [positions]
                 ksi_dic[key]["score"] = phospho_score
                 ksi_dic[key]["PMIDs"] = PMIDs
                 ksi_dic[key]["dates"] = dates
@@ -145,14 +147,22 @@ with open(args.phosphonetfile2) as netfile:
                 ksi_dic[key]["type"] = "KSI"
                 ksi_dic[key]["phospho_score"] = phospho_score
             else:
-                ksi_dic[key]["phospho_positions"].append(phospho_positions)
+                ksi_dic[key]["positions"].append(positions)
                 ksi_dic[key]["phospho_score"].append(phospho_score)
 
 
 notkin = list(set(notkin))
 notmapped = list(set(notmapped))
 
-with open("phosphonetworks_ksi.txt", "w") as outfile:
+today = datetime.date.today().strftime("%Y%m%d")
+if args.outputfile:
+    outfilename = args.outputfile
+else:
+    outfilename = args.phosphonetfile.split(".")[0]
+    outfilename += "_ksi_" + today + ".txt"
+
+
+with open(outfilename, "w") as outfile:
     
     for field in outfields:
         outfile.write(field + "\t")
@@ -169,4 +179,4 @@ with open("phosphonetworks_ksi.txt", "w") as outfile:
 
 print("\nSUMMARY:\n")
 print("\tNot mapped by name to Uniprot: %d being %s\n" %(len(notmapped),','.join(notmapped)))
-print("\tKinases not in list: %d being %s\n"%(len(notkin), ','.join(notkin)))
+print("\tKinases not in list: %d being %s\n" %(len(notkin), ','.join(notkin)))

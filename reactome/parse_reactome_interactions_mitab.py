@@ -13,19 +13,22 @@
 ########################################################################################################################
 import argparse
 import re
-from xml.etree import ElementTree as et
 import mappings as map
+import datetime
 
+
+today = datetime.date.today().strftime("%Y%m%d")
 # parse arguments
 parser = argparse.ArgumentParser(description="Extraction of KSI from Reactome interaction file, in mitab format.")
 
 parser.add_argument("reactomefile")
 parser.add_argument("-t", "--int_type", help="interaction type", choices=["association", "physical association", "any"], default="any")
-
+parser.add_argument("-o", "--outputfile", help="name of output file")
 args = parser.parse_args()
 
 # create list of kinases uniprot accession codes
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol = map.getUniprotMapDicts(synonyms=False)
+sec2prim = map.getSecondary2PrimaryAcc()
 
 # read reactome interactions file
 up_regex = "^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$"
@@ -77,9 +80,14 @@ with open(args.reactomefile) as rfile:
             ppi_dic[key]["complex_id"].extend(complex_ids)
             ppi_dic[key]["pmid"].extend([pmid])
 
-outfilename = "reactome_mitab_ppi_" + args.int_type + ".txt"
-outfilename = re.sub(" ", "", outfilename)
-fields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", 
+
+if args.outputfile:
+    outfilename = args.outputfile
+else:
+    outfilename = "reactome_mitab_ppi_" + args.int_type + "_" + today + ".txt"
+    outfilename = re.sub(" ", "", outfilename)
+
+fields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type",
           "source_is_bait", "target_is_bait"]
 fields.extend(["complex_id", "interaction_type"]) # in case i want to add them
 dates = '2014'
@@ -102,14 +110,22 @@ with open(outfilename, 'w') as outfile:
         try:
             source_name = uniprot2symbol[source]
         except:
-            nomap.append(source)
-            continue
+            try:
+                source = sec2prim[source]
+                source_name = uniprot2symbol[source]
+            except:
+                nomap.append(source)
+                continue
 
         try:
             target_name = uniprot2symbol[target]
         except:
-            nomap.append(target)
-            continue
+            try:
+                target = sec2prim[target]
+                target_name = uniprot2symbol[target_name]
+            except:
+                nomap.append(target)
+                continue
 
         PMIDs = ','.join(set(ppi_dic[key]["pmid"]))
 

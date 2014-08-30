@@ -10,19 +10,20 @@
 ##################################################################################################
 
 import argparse
-import re
+import datetime
 import mappings as map
-
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Assembly of KSI from PhosphoSitePlus.")
 
 parser.add_argument("phosphositefile")
+parser.add_argument("-o", "--outputfile", help="name of output file")
 
 args = parser.parse_args()
 
 # create dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol, syn2uniprot, uniprot2syn = map.getUniprotMapDicts(synonyms=True)
+sec2prim = map.getSecondary2PrimaryAcc()
 
 #create list of kinases uniprot accession codes
 kinacc2name = map.getKinaseAcc2Symbol()
@@ -51,11 +52,15 @@ with open(args.phosphositefile) as phosfile:
             target_name = uniprot2symbol[subs_acc]
         except:
             try:
-                subs_acc = syn2uniprot[subs_symb]
+                subs_acc = sec2prim[subs_acc]
+                target_name = uniprot2symbol[subs_acc]
             except:
-                notmapped_up.append(subs_acc)
-                continue
-            target_name = uniprot2symbol[subs_acc]
+                try:
+                    subs_acc = syn2uniprot[subs_symb]
+                    target_name = uniprot2symbol[subs_acc]
+                except:
+                    notmapped_up.append(subs_acc)
+                    continue
         target = subs_acc
 
         # kinase
@@ -67,10 +72,14 @@ with open(args.phosphositefile) as phosfile:
             source_name = uniprot2symbol[kin_acc]
         except:
             try:
-                kin_acc = syn2uniprot[kin_symb]
+                kin_acc = sec2prim[kin_acc]
+                source_name = uniprot2symbol[kin_acc]
             except:
-                notmapped_up.append(kin_acc)
-                continue
+                try:
+                    kin_acc = syn2uniprot[kin_symb]
+                except:
+                    notmapped_up.append(kin_acc)
+                    continue
 
             if not kinacc2name.has_key(kin_acc):
                 notkin.append(kin_acc)
@@ -102,13 +111,13 @@ with open(args.phosphositefile) as phosfile:
             ksi_dic[key]['source_name'] = source_name
             ksi_dic[key]['target_name'] = target_name
             ksi_dic[key]['PMIDs'] = "22135298"
-            ksi_dic[key]['phospho_positions'] = [phospho_position]
+            ksi_dic[key]['positions'] = [phospho_position]
             ksi_dic[key]['method'] = [method]
             ksi_dic[key]['dates'] = '2014'
             ksi_dic[key]['sources'] = "phosphositeplus"
             ksi_dic[key]['type'] = "KSI"
         else:
-            ksi_dic[key]['phospho_positions'].append(phospho_position)
+            ksi_dic[key]['positions'].append(phospho_position)
             ksi_dic[key]['method'].append(method)
 
 notkin = list(set(notkin))
@@ -116,12 +125,19 @@ notmapped_up = list(set(notmapped_up))
 
 # write file
 
-outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
+outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "positions"]
 outfields.append("method")
 
 print("\nWriting output file...\n")
 
-with open("phosphositeplus_ksi.txt", "w") as outfile:
+today = datetime.date.today().strftime("%Y%m%d")
+if args.outputfile:
+    outfilename = args.outputfile
+else:
+    outfilename = args.phosphositefile.split(".")[0]
+    outfilename += "_ksi_" + today + ".txt"
+
+with open(outfilename, "w") as outfile:
         for field in outfields:
             outfile.write(field + "\t")
         outfile.write("\n")

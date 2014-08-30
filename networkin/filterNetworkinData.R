@@ -39,12 +39,33 @@ nkin.true <- nkin[nkin.safe,]
 #2. Try selecting only the networking_score (in the literature they say that >1 is already relatively good)
 nkin.true$ksi_type <- "experimental"
 nkin$ksi_type  <- "computational"
-exp_comp_ksi <- rbind(nkin.true, nkin)
+exp_comp_ksi <- rbind(nkin, nkin.true)
 
-p <- ggplot(exp_comp_ksi)
-p <- p + geom_boxplot(aes(y=as.numeric(networkin_score), x=factor(ksi_type)))
-p <- p + coord_cartesian(ylim=c(0,15))
+
+p <- ggplot(exp_comp_ksi, aes(y=as.numeric(networkin_score), 
+                              x=factor(ksi_type),
+                              fill=factor(ksi_type)))
+# p <- p + geom_point(aes(x=1:length(networkin_score), y=networkin_score, 
+#                         color=ksi_type), alpha=0.2)
+# p <- p + coord_trans(y="log10", x="log10")
+p <- p + geom_boxplot(outlier.colour= 'grey90',
+                      outlier.shape = 20, outlier.size = 1,
+                      size=1)
+p <- p + coord_cartesian(ylim=c(0,10))
+p <- p + theme(panel.background=element_blank(),
+               panel.grid=element_blank(),
+               axis.line=element_line(color='grey20'), 
+               axis.ticks=element_line(color="grey20"),
+               axis.text=element_text(color='black', size=30),
+               axis.title=element_text(color='black', size=30),
+               legend.position='None')
+p <- p + scale_fill_manual(labels=unique(exp_comp_ksi$ksi_type), 
+                              values=c('#E7F2EF', '#40B9D4'))
+p <- p + ylab("NetworKin score") + xlab("")
+
+jpeg("networkin_boxplots_fill.jpg", width=950, height=750)
 p
+dev.off()
 
 # chose as threshold 50% of experimental (very conservative but otherwise too many!)
 thres <- quantile(nkin.true$networkin_score, 0.5)
@@ -63,11 +84,11 @@ for (key in uniq.keys){
                              collapse=",")
   uniq.df <- unique(ints[, c('source', 'target', 'source_name', 'target_name', 'PMIDs',
                              'dates', 'sources', 'type')])
-  uniq.df$phospho_positions <- phospho_positions
+  uniq.df$positions <- phospho_positions
   
-  netkin.ksi.final <- rbind(netkin.ksi_final, uniq.df)
+  netkin.ksi.final <- rbind(netkin.ksi.final, uniq.df)
 }
-write.table(netkin.ksi.final, "networkin_filtered_ksi.txt", row.names=FALSE, quote=FALSE,
+write.table(netkin.ksi.final, "networkin_filtered_ksi-20140828-2.txt", row.names=FALSE, quote=FALSE,
             sep="\t", col.names=TRUE)
 netkin.ksi.final
   

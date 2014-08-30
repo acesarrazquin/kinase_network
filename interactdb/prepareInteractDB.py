@@ -32,7 +32,7 @@ parser.add_argument("-t", "--type", choices=["PPI", "KSI", "ESI"], default="PPI"
 parser.add_argument("-x", "--taxon", choices=["human", "mouse"], default="human")
 parser.add_argument("-c", "--cemm", action="store_true", help="include CeMM confidential interactions")
 parser.add_argument("-z", "--couzens", action="store_true", help="include interactions from 'Couzens et al.'")
-parser.add_argument("-v", "--convert", action="store_true", help="convert secondary to primary accessions (time expensive, retrieves few more interactions)")
+# parser.add_argument("-v", "--convert", action="store_true", help="convert secondary to primary accessions (time expensive, retrieves few more interactions)")
 
 args = parser.parse_args()
 
@@ -44,8 +44,8 @@ elif args.taxon == "mouse":
 
 # create dictionary of uniprot accession codes to gene symbols
 uniprot2symbol = map.getUniprotMapDicts()
-if args.convert:
-    sec2prim = map.getSecondary2PrimaryAcc()
+# if args.convert:
+sec2prim = map.getSecondary2PrimaryAcc()
 
 # create list of kinases uniprot accession codes
 kinacc2name = map.getKinaseAcc2Symbol()
@@ -360,6 +360,9 @@ with open(outfilename, "w") as outfile:
         for field in fields:
             towrite = interact[key][field]
             if type(towrite) == list:
+                #patch for biogrids
+                while "biogrid" in towrite:
+                    towrite.remove("biogrid")
                 towrite = ','.join(set(towrite))
             outfile.write(towrite + '\t')
         outfile.write("\n")

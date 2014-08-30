@@ -10,25 +10,28 @@
 #   Notes: - needed to
 #             -convert ensp to uniprot (because some substrates are written as ensp)
 #             -convert uniprot to symbol
-#             -secondary accession to primary accession? todo
+#             -secondary accession to primary accession
 #          - for many substrates there is no kinase information
 #       
 #########################################################################################################
 import argparse
 import re
 import mappings as map
+import datetime
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Assembly of KSI from PhosphoELM.")
 
 parser.add_argument("phosphoelmfile")
 parser.add_argument("kinasenamefile")
+parser.add_argument("-o", "--outputfile", help="name of output file")
 
 args = parser.parse_args()
 
 
 # create dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol, syn2uniprot, uniprot2syn = map.getUniprotMapDicts(synonyms=True)
+sec2prim = map.getSecondary2PrimaryAcc()
 
 # create a dictionary of ensp identifiers to uniprot accession codes
 ensp2uniprot = map.getEnsp2Uniprot()
@@ -100,8 +103,12 @@ with open(args.phosphoelmfile) as elmfile:
             target_name = uniprot2symbol[substrate_acc]
         except: 
             #print("UniProt not in list: %s"%(substrate_acc)) # not mapped
-            notmapped_up.append(substrate_acc)
-            continue
+            try:
+                substrate_acc = sec2prim[substrate_acc]
+                target_name = uniprot2symbol[substrate_acc]
+            except:
+                notmapped_up.append(substrate_acc)
+                continue
         target = substrate_acc
         
         # kinase
@@ -115,14 +122,19 @@ with open(args.phosphoelmfile) as elmfile:
         try:
             source_name = kinacc2name[source]
         except:
-            nolist_kin.append(source)
-            continue
+            try:
+                source = sec2prim[source]
+                source_name = kinacc2name[source]
+            except:
+                nolist_kin.append(source)
+                continue
         
         # rest of fields
-        phospho_position = split_line[2] # only one in each line
+        position = split_line[2] # only one in each line
         pmid = split_line[4] # only one in each line, can be N.N.
-        if pmid == "N.N.":
-            pmid == ""
+
+        if pmid == 'N.N.':
+            pmid = ""
         experiment = split_line[6] # only one
         dates = split_line[8][0:4]
 
@@ -137,14 +149,14 @@ with open(args.phosphoelmfile) as elmfile:
             ksi_dic[key]['target_name'] = target_name
             
             ksi_dic[key]['PMIDs'] = [pmid]
-            ksi_dic[key]['phospho_positions'] = [phospho_position]
+            ksi_dic[key]['positions'] = [position]
             ksi_dic[key]['experiment'] = [experiment]
             ksi_dic[key]['dates'] = [dates]
             ksi_dic[key]['sources'] = "phospho.elm"
             ksi_dic[key]['type'] = "KSI"
         else:
             ksi_dic[key]['PMIDs'].append(pmid)
-            ksi_dic[key]['phospho_positions'].append(phospho_position)
+            ksi_dic[key]['positions'].append(position)
             ksi_dic[key]['experiment'].append(experiment)
             ksi_dic[key]['dates'].append(dates)
 
@@ -156,10 +168,17 @@ nolist_kin = list(set(nolist_kin))
 # write file
 print("\nWriting output file...\n")
 
-outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
+outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "positions"]
 outfields.append("experiment")
 
-with open("phosphoelm_ksi.txt", 'w') as outfile:
+today = datetime.date.today().strftime("%Y%m%d")
+if args.outputfile:
+    outfilename = args.outputfile
+else:
+    outfilename = args.phosphoelmfile.split(".")[0]
+    outfilename += "_ksi_" + today + ".txt"
+
+with open(outfilename, 'w') as outfile:
     for field in outfields:
         outfile.write(field + "\t")
     outfile.write("\n")

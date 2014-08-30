@@ -9,6 +9,7 @@
 import argparse
 import re
 import mappings as map
+import datetime
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Assembly of KSI from NetworKIN predictions.")
@@ -18,9 +19,9 @@ parser.add_argument("-o", "--outputfile", help="name of output file")
 
 args = parser.parse_args()
 
-
+today = datetime.date.today().strftime("%Y%m%d")
 # create dictionary of uniprot accession codes to gene symbols
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol, syn2uniprot, uniprot2syn = map.getUniprotMapDicts(synonyms=True)
 
 # create a dictionary of ensp identifiers to uniprot accession codes
 ensp2uniprot = map.getEnsp2Uniprot()
@@ -32,7 +33,7 @@ kinacc2name = map.getKinaseAcc2Symbol()
 if args.outputfile:
     outputfile = args.outputfile
 else:
-    outputfile = args.networkinfile.split(".")[0]+"_formated.txt"
+    outputfile = args.networkinfile.split(".")[0]+"_formated_" + today + ".txt"
 
 outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
 outfields.extend(["networkin_score", "netphorest_score", "string_score"])

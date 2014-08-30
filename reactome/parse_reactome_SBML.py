@@ -17,16 +17,19 @@ import argparse
 import re
 from xml.etree import ElementTree as et
 import mappings as map
+import datetime
 
 # parse arguments
 parser = argparse.ArgumentParser(description="Extraction of KSI from Reactome SBML files.")
 
 parser.add_argument("reactomefile")
+parser.add_argument("-o", "--outputfile", help="name of output file")
 
 args = parser.parse_args()
 
 # create list of kinases uniprot accession codes
-uniprot2symbol, syn2uniprot = map.getUniprotMapDicts()
+uniprot2symbol = map.getUniprotMapDicts()
+sec2prim = map.getSecondary2PrimaryAcc()
 
 # create dictionary of uniprot accession codes to gene symbols (if no symbol:empty string)
 kinacc2name = map.getKinaseAcc2Symbol()
@@ -183,14 +186,22 @@ for react in root.getiterator("{http://www.sbml.org/sbml/level2/version4}reactio
 
 # write file
 print("\nWriting files...\n")
-outfilename1 = "reactome_ksi.txt"
-outfilename2 = "reactome_ksi_ambiguous.txt"
-outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "phospho_positions"]
+
+today = datetime.date.today().strftime("%Y%m%d")
+if args.outputfile:
+    outfilename1 = args.outputfile
+    outfilename2 = outfilename1.split(".")[0]+"_ambiguous.txt"
+else:
+    outfilename = args.reactomefile.split(".")[0]
+    outfilename1 += "_ksi_" + today + ".txt"
+    outfilename2 = "_ksi_ambiguous_" + today + ".txt"
+
+outfields = ["source", "target", "source_name", "target_name", "PMIDs", "dates", "sources", "type", "positions"]
     
 dates = "2014"
 sources = "reactome"
 type = "KSI"
-phospho_positions = ""
+positions = ""
 nomap = []
 with open(outfilename1, "w") as outfile1, open(outfilename2, "w") as outfile2:
         for field in outfields:
@@ -218,14 +229,28 @@ with open(outfilename1, "w") as outfile1, open(outfilename2, "w") as outfile2:
                     source_name.append(src_name)
                     source.append(src)
                 else:
-                    nomap.append(src)
+                    try:
+                        src = sec2prim[src]
+                        src_name = uniprot2symbol[src]
+                        source_name.append(src_name)
+                        source.append(src)
+                    except:
+                        nomap.append(src)
+
             for tar in target_all:
                 if tar in uniprot2symbol.keys():
                     tar_name = uniprot2symbol[tar]
                     target_name.append(tar_name)
                     target.append(tar)
                 else:
-                    nomap.append(tar)
+                    try:
+                        tar = sec2prim[tar]
+                        tar_name = uniprot2symbol[tar]
+                        target_name.append(tar_name)
+                        target.append(tar)
+                    except:
+                        nomap.append(tar)
+
             for prod in product_all:
                 if prod in uniprot2symbol.keys():
                     prod_name = uniprot2symbol[prod]

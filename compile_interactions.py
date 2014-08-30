@@ -102,7 +102,7 @@ for filename in args.files:
                                 int_dic[key][bait] = "no"
                     elif args.int_type == "KSI":
                         updateKey(int_dic, key, PMIDs=PMIDs, sources=sources, dates=dates,
-                                  phospho_positions=phospho_positions)
+                                  positions=positions)
                     elif args.int_type == "DPI":
                         updateKey(int_dic, key, PMIDs=PMIDs, sources=sources, dates=dates,
                                   target_form=target_form, strength=strength, strength_type=strength_type,

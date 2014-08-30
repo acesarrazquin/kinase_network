@@ -92,8 +92,13 @@ netCountsAbs <- function(infile, type){
   df.type <- rbind(df.type, data.frame(t(total)))
   
   if (type == "DPI"){  
-    colnames(df.type) <- c(as.character(dpi.mapping$name), 'total')
-    row.names(df.type)  <- c(as.character(dpi.mapping$name), 'total')
+    src_names = c()
+    for (src in sources){
+      src_name = as.character(dpi.mapping[dpi.mapping$pid==src, 'name'])
+      src_names = c(src_names, src_name)
+    }
+    colnames(df.type) <- c(src_names, 'total')#c(as.character(dpi.mapping$name), 'total')
+    row.names(df.type)  <- colnames(df.type)
     
   }else{
     row.names(df.type) <- c(sources, 'total')
@@ -101,8 +106,8 @@ netCountsAbs <- function(infile, type){
   
   split.infile.name <- strsplit(strsplit(infile, "\\.")[[1]][1], "_")[[1]]
   date <- paste(split.infile.name[3:length(split.infile.name)], collapse="_")
-  #outname <- paste(type, "_counts_", date, ".txt", sep="")
-  outname <- paste(type, "_counts2_Jacques_20140211.txt", sep="")
+  outname <- paste(type, "_counts_20140828.txt", sep="")
+  #outname <- paste(type, "_counts2_Jacques_20140211.txt", sep="")
   write.table(df.type, outname, sep="\t", 
               quote=FALSE, row.names=TRUE, col.names=TRUE)
   
@@ -125,13 +130,12 @@ netCountsRel <- function(infile, type){
   int.type <- fullnet[fullnet$type == type, ]
   total.type <- nrow(int.type)
   if (type=="KSI"){
-    sources <- c("networkin", "phospho.elm","phosphositeplus","phosphonetworks","intact",
-                 "pid(NCI-Nature_Curated)","pid(Reactome)","reactome","PID","dip","innatedb","mint",
+    sources <- c("networkin", "phospho.elm","phosphositeplus","phosphonetworks","intact","reactome","PID","dip","innatedb","mint",
                  "hprd","corum","Behrends2010" )
     
   }else if (type=="PPI"){
     sources <- c("intact","mint","innatedb","dip","matrixdb","corum","hprd",
-                 "PID","pid(BioCarta)","pid(NCI-Nature_Curated)","pid(Reactome)","reactome","Behrends2010")
+                 "PID","reactome","Behrends2010")
     
   }else if (type=="DPI"){
     options(stringsAsFactors=FALSE)
@@ -192,7 +196,14 @@ plotOverlap <- function(infile, type="PPI"){
                                limits=c(0,1))
   p <- p + theme(panel.grid=element_blank(), panel.background=element_blank())
   
-  p <- p + theme(axis.text.y=element_text(size=10),
-                 axis.text.x=element_text(angle=45, hjust=1, size=10))
+  p <- p + theme(axis.text.y=element_text(size=12),
+                 axis.text.x=element_text(angle=45, hjust=1, size=12))
+  p <- p +ylab("sources") + xlab("")
   p
+}
+
+savePlot <- function(plot, name){
+  pdf(name, 10, 8)
+  print(plot)
+  dev.off()
 }
